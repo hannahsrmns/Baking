@@ -32,14 +32,6 @@
         #recipe-modal, #auth-modal {
             transition: opacity 0.3s ease-in-out;
         }
-        .calc-mode-btn.active {
-            background-color: #ec4899; /* pink-500 */
-            color: white;
-        }
-        .calc-mode-btn:not(.active) {
-            background-color: white;
-            color: #ec4899; /* pink-500 */
-        }
         #instructions-panel ol {
             list-style-type: decimal;
             padding-left: 1.5rem;
@@ -67,10 +59,10 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <!-- Left Column: Calculator -->
                 <div class="space-y-8">
-                    <!-- Step 1: Base Recipe -->
+                    <!-- Base Recipe Section -->
                     <div class="space-y-4">
                         <div class="flex justify-between items-center border-b-2 border-pink-100 pb-2">
-                             <h2 class="text-2xl font-bold text-pink-600">Choose Recipe</h2>
+                             <h2 class="text-2xl font-bold text-pink-600">Base Recipe</h2>
                         </div>
                         <div class="flex items-center space-x-2">
                             <select id="recipe-select" class="flex-grow p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none bg-white"></select>
@@ -82,32 +74,13 @@
                         </div>
                     </div>
 
-                    <!-- Step 2: Calculation -->
+                    <!-- Calculation Section -->
                     <div class="space-y-4">
-                        <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2"> Calculator</h2>
-                        <div class="flex justify-center space-x-2 bg-pink-100 p-2 rounded-lg">
-                            <button id="calc-mode-unit" class="calc-mode-btn active w-full py-2 rounded-md transition-colors">By Unit</button>
-                            <button id="calc-mode-weight" class="calc-mode-btn w-full py-2 rounded-md transition-colors">By Total Weight</button>
-                        </div>
+                        <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2">Calculate</h2>
                         <div id="calc-input-container" class="bg-pink-100 p-4 rounded-lg">
-                            <div id="calc-by-unit" class="flex flex-col items-center space-y-2">
-                                <div class="flex items-center justify-center space-x-4 w-full">
-                                    <label for="unit-count" class="text-lg font-medium text-pink-700 whitespace-nowrap">How many units?</label>
-                                    <input type="number" id="unit-count" value="1" min="1" step="0.1" class="w-32 p-2 border border-pink-300 rounded-lg text-center text-lg font-bold focus:ring-2 focus:ring-pink-400 focus:outline-none">
-                                </div>
-                                <p class="text-xs text-pink-400 pt-2 text-center">A 'unit' can be one cookie, one tart shell, or one full batch.</p>
-                            </div>
-                            <div id="calc-by-weight" class="hidden">
-                                <div class="flex flex-col items-center space-y-2">
-                                    <div class="flex items-center justify-center space-x-4 w-full">
-                                        <label for="total-weight" class="text-lg font-medium text-pink-700 whitespace-nowrap">Desired total weight?</label>
-                                        <div class="flex items-center space-x-2">
-                                            <input type="number" id="total-weight" value="500" min="1" class="w-32 p-2 border border-pink-300 rounded-lg text-center text-lg font-bold focus:ring-2 focus:ring-pink-400 focus:outline-none">
-                                            <span class="text-pink-500 font-medium text-lg">g</span>
-                                        </div>
-                                    </div>
-                                    <p class="text-xs text-pink-400 pt-2 text-center">This mode requires all ingredients to have a weight-based unit (g or kg).</p>
-                                </div>
+                            <div id="calc-by-batch" class="flex items-center justify-center space-x-4 w-full">
+                                <label for="batch-count" class="text-lg font-medium text-pink-700 whitespace-nowrap">How many batches?</label>
+                                <input type="number" id="batch-count" value="1" min="0.1" step="0.1" class="w-32 p-2 border border-pink-300 rounded-lg text-center text-lg font-bold focus:ring-2 focus:ring-pink-400 focus:outline-none">
                             </div>
                         </div>
                         <button id="calculate-btn" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all">
@@ -214,7 +187,6 @@
         // --- App State ---
         let db, auth, userId, recipeUnsubscribe, appId;
         let userRecipes = {};
-        let calculationMode = 'unit'; // 'unit' or 'weight'
         const units = ["g", "kg", "ml", "L", "tsp", "tbsp", "cup", "pcs"];
 
         // --- DOM Elements ---
@@ -231,8 +203,7 @@
         const ingredientsList = document.getElementById('ingredients-list');
         const instructionsPanel = document.getElementById('instructions-panel');
         const calculateBtn = document.getElementById('calculate-btn');
-        const unitCountInput = document.getElementById('unit-count');
-        const totalWeightInput = document.getElementById('total-weight');
+        const batchCountInput = document.getElementById('batch-count');
         const resultsContainer = document.getElementById('results-container');
         const batchInfoPanel = document.getElementById('batch-info-panel');
         const batchInfoContainer = document.getElementById('batch-info-container');
@@ -250,10 +221,6 @@
         const modalAddIngredientBtn = document.getElementById('modal-add-ingredient-btn');
         const saveRecipeBtn = document.getElementById('save-recipe-btn');
         const deleteRecipeBtn = document.getElementById('delete-recipe-btn');
-        const calcModeUnitBtn = document.getElementById('calc-mode-unit');
-        const calcModeWeightBtn = document.getElementById('calc-mode-weight');
-        const calcByUnitDiv = document.getElementById('calc-by-unit');
-        const calcByWeightDiv = document.getElementById('calc-by-weight');
 
         // --- Functions ---
         
@@ -426,107 +393,45 @@
                 return;
             }
 
-            let resultsHTML = '';
-            
-            if (calculationMode === 'unit') {
-                const unitCount = parseFloat(unitCountInput.value) || 0;
-                if (unitCount <= 0) {
-                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please enter a valid number of units.</p>`;
-                    return;
-                }
-                resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${unitCount} unit(s), you will need:</h3><ul class="space-y-2">`;
-                ingredientRows.forEach(row => {
-                    const name = row.querySelector('input[type="text"]').value.trim();
-                    const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
-                    const unit = row.querySelector('select').value;
-                    if (name && amount > 0) {
-                        const totalAmount = amount * unitCount;
-                        const formattedAmount = Number.isInteger(totalAmount) ? totalAmount.toLocaleString() : totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-                        resultsHTML += `<li class="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm"><span class="font-medium text-pink-800">${name}</span><span class="font-bold text-lg text-pink-500">${formattedAmount} ${unit}</span></li>`;
-                    }
-                });
-
-                const recipeId = recipeSelect.value;
-                const currentRecipe = userRecipes[recipeId];
-                if (currentRecipe && currentRecipe.unitsPerBatch > 0) {
-                    const totalUnits = unitCount * currentRecipe.unitsPerBatch;
-                    let batchInfoHTML = `<ul class="space-y-2">`;
-                    batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Units per Batch:</span><span class="font-bold">${currentRecipe.unitsPerBatch}</span></li>`;
-                    batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Total Units:</span><span class="font-bold">${totalUnits.toLocaleString()}</span></li>`;
-                    if (currentRecipe.weightPerUnit > 0) {
-                        const totalWeight = totalUnits * currentRecipe.weightPerUnit;
-                        batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Total Weight:</span><span class="font-bold">${totalWeight.toLocaleString()}g</span></li>`;
-                    }
-                    batchInfoHTML += `</ul>`;
-                    batchInfoContainer.innerHTML = batchInfoHTML;
-                    batchInfoPanel.classList.remove('hidden');
-                }
-
-            } else { // calculationMode === 'weight'
-                const desiredWeight = parseFloat(totalWeightInput.value) || 0;
-                if (desiredWeight <= 0) {
-                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please enter a valid total weight.</p>`;
-                    return;
-                }
-
-                let singleBatchWeight = 0;
-                let hasInvalidUnit = false;
-                const baseIngredients = [];
-
-                ingredientRows.forEach(row => {
-                    const name = row.querySelector('input[type="text"]').value.trim();
-                    const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
-                    const unit = row.querySelector('select').value;
-                    
-                    baseIngredients.push({name, amount, unit});
-
-                    if (unit === 'g') {
-                        singleBatchWeight += amount;
-                    } else if (unit === 'kg') {
-                        singleBatchWeight += amount * 1000;
-                    } else {
-                        hasInvalidUnit = true;
-                    }
-                });
-
-                if (hasInvalidUnit) {
-                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Calculation error: 'By Total Weight' mode requires all ingredients to use 'g' or 'kg' units.</p>`;
-                    return;
-                }
-                
-                if (singleBatchWeight === 0) {
-                     resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Cannot calculate with a total base weight of 0.</p>`;
-                    return;
-                }
-
-                const scalingFactor = desiredWeight / singleBatchWeight;
-                resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${desiredWeight}g total, you will need:</h3><ul class="space-y-2">`;
-                
-                baseIngredients.forEach(ing => {
-                    if (ing.name && ing.amount > 0) {
-                        const totalAmount = ing.amount * scalingFactor;
-                        const formattedAmount = Number.isInteger(totalAmount) ? totalAmount.toLocaleString() : totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
-                        resultsHTML += `<li class="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm"><span class="font-medium text-pink-800">${ing.name}</span><span class="font-bold text-lg text-pink-500">${formattedAmount} ${ing.unit}</span></li>`;
-                    }
-                });
+            const batchCount = parseFloat(batchCountInput.value) || 0;
+            if (batchCount <= 0) {
+                resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please enter a valid number of batches.</p>`;
+                return;
             }
-
+            let resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${batchCount} batch(es), you will need:</h3><ul class="space-y-2">`;
+            ingredientRows.forEach(row => {
+                const name = row.querySelector('input[type="text"]').value.trim();
+                const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+                const unit = row.querySelector('select').value;
+                if (name && amount > 0) {
+                    const totalAmount = amount * batchCount;
+                    const formattedAmount = Number.isInteger(totalAmount) ? totalAmount.toLocaleString() : totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                    resultsHTML += `<li class="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm"><span class="font-medium text-pink-800">${name}</span><span class="font-bold text-lg text-pink-500">${formattedAmount} ${unit}</span></li>`;
+                }
+            });
             resultsHTML += `</ul>`;
             resultsContainer.innerHTML = resultsHTML;
-        }
 
-        function setCalculationMode(mode) {
-            calculationMode = mode;
-            if (mode === 'unit') {
-                calcModeUnitBtn.classList.add('active');
-                calcModeWeightBtn.classList.remove('active');
-                calcByUnitDiv.classList.remove('hidden');
-                calcByWeightDiv.classList.add('hidden');
-            } else {
-                calcModeWeightBtn.classList.add('active');
-                calcModeUnitBtn.classList.remove('active');
-                calcByWeightDiv.classList.remove('hidden');
-                calcByUnitDiv.classList.add('hidden');
+            const recipeId = recipeSelect.value;
+            const currentRecipe = userRecipes[recipeId];
+            if (currentRecipe && currentRecipe.unitsPerBatch > 0) {
+                const totalUnits = batchCount * currentRecipe.unitsPerBatch;
+                let batchInfoHTML = `<table class="w-full text-sm"><tbody>`;
+                
+                batchInfoHTML += `<tr class="border-b border-pink-200"><td class="py-2 font-medium">1 Batch</td><td class="py-2 text-right font-bold">${currentRecipe.unitsPerBatch} Units</td></tr>`;
+
+                if (currentRecipe.weightPerUnit > 0) {
+                    const totalWeight = totalUnits * currentRecipe.weightPerUnit;
+                     batchInfoHTML += `<tr class="border-b border-pink-200"><td class="py-2 font-medium">1 Unit</td><td class="py-2 text-right font-bold">${currentRecipe.weightPerUnit}g</td></tr>`;
+                     batchInfoHTML += `<tr class="border-b border-pink-200"><td class="py-2 font-medium">Total Units</td><td class="py-2 text-right font-bold">${totalUnits.toLocaleString()}</td></tr>`;
+                     batchInfoHTML += `<tr><td class="py-2 font-medium">Total Batch Weight</td><td class="py-2 text-right font-bold">${totalWeight.toLocaleString()}g</td></tr>`;
+                } else {
+                     batchInfoHTML += `<tr><td class="py-2 font-medium">Total Units</td><td class="py-2 text-right font-bold">${totalUnits.toLocaleString()}</td></tr>`;
+                }
+
+                batchInfoHTML += `</tbody></table>`;
+                batchInfoContainer.innerHTML = batchInfoHTML;
+                batchInfoPanel.classList.remove('hidden');
             }
         }
 
@@ -566,7 +471,7 @@
             // Initialize Firebase
             try {
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'recipe-calculator-app';
-                const firebaseConfig = {
+const firebaseConfig = {
   apiKey: "AIzaSyBd5oNs1PjHhOLVGS5u2Ovt0KeXLmQ5hn0",
   authDomain: "recipe-batch-calculator.firebaseapp.com",
   projectId: "recipe-batch-calculator",
@@ -628,8 +533,6 @@
             modalAddIngredientBtn.addEventListener('click', () => addIngredientRow(modalIngredientsContainer));
             saveRecipeBtn.addEventListener('click', saveRecipe);
             deleteRecipeBtn.addEventListener('click', deleteRecipe);
-            calcModeUnitBtn.addEventListener('click', () => setCalculationMode('unit'));
-            calcModeWeightBtn.addEventListener('click', () => setCalculationMode('weight'));
             loginBtn.addEventListener('click', handleLogin);
             registerBtn.addEventListener('click', handleRegister);
             signOutBtn.addEventListener('click', handleSignOut);

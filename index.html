@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Batch Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Pacifico&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .title-font {
+            font-family: 'Pacifico', cursive;
+        }
+        .ingredient-row, .modal-ingredient-row {
+            transition: all 0.3s ease-in-out;
+            overflow: hidden;
+        }
+        select {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='%23ec4899' viewBox='0 0 16 16'%3E%3Cpath fill-rule='evenodd' d='M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            background-size: 1em;
+            padding-right: 2rem;
+        }
+        #recipe-modal, #auth-modal {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .calc-mode-btn.active {
+            background-color: #ec4899; /* pink-500 */
+            color: white;
+        }
+        .calc-mode-btn:not(.active) {
+            background-color: white;
+            color: #ec4899; /* pink-500 */
+        }
+        #instructions-panel ol {
+            list-style-type: decimal;
+            padding-left: 1.5rem;
+        }
+    </style>
+</head>
+<body class="bg-pink-50 text-pink-800 min-h-screen flex items-center justify-center p-4">
+
+    <div id="app-container" class="w-full max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-8 space-y-8 hidden">
+        
+        <!-- Header -->
+        <div class="flex justify-between items-center">
+            <div class="text-left">
+                 <h1 class="title-font text-4xl text-pink-500">Recipe Batch Calculator</h1>
+                 <p class="text-pink-400 mt-2">Your personal recipe book and batching assistant.</p>
+            </div>
+            <div id="user-info" class="text-right">
+                <p class="text-sm text-pink-500">Signed in as: <span id="user-email" class="font-bold"></span></p>
+                <button id="sign-out-btn" class="text-sm text-red-500 hover:underline">Sign Out</button>
+            </div>
+        </div>
+
+        <div>
+            <!-- Top Grid: Calculator and Results -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Left Column: Calculator -->
+                <div class="space-y-8">
+                    <!-- Step 1: Base Recipe -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center border-b-2 border-pink-100 pb-2">
+                             <h2 class="text-2xl font-bold text-pink-600">Choose Recipe</h2>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <select id="recipe-select" class="flex-grow p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none bg-white"></select>
+                            <button id="add-recipe-btn" class="bg-pink-200 hover:bg-pink-300 text-pink-700 font-bold py-2 px-3 rounded-lg transition-colors whitespace-nowrap">+ Add</button>
+                            <button id="edit-recipe-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2 px-3 rounded-lg transition-colors hidden">Edit</button>
+                        </div>
+                        <div id="ingredients-list" class="space-y-3 pt-2">
+                            <!-- Ingredient rows will be populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Step 2: Calculation -->
+                    <div class="space-y-4">
+                        <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2"> Calculator</h2>
+                        <div class="flex justify-center space-x-2 bg-pink-100 p-2 rounded-lg">
+                            <button id="calc-mode-unit" class="calc-mode-btn active w-full py-2 rounded-md transition-colors">By Unit</button>
+                            <button id="calc-mode-weight" class="calc-mode-btn w-full py-2 rounded-md transition-colors">By Total Weight</button>
+                        </div>
+                        <div id="calc-input-container" class="bg-pink-100 p-4 rounded-lg">
+                            <div id="calc-by-unit" class="flex flex-col items-center space-y-2">
+                                <div class="flex items-center justify-center space-x-4 w-full">
+                                    <label for="unit-count" class="text-lg font-medium text-pink-700 whitespace-nowrap">How many units?</label>
+                                    <input type="number" id="unit-count" value="1" min="1" step="0.1" class="w-32 p-2 border border-pink-300 rounded-lg text-center text-lg font-bold focus:ring-2 focus:ring-pink-400 focus:outline-none">
+                                </div>
+                                <p class="text-xs text-pink-400 pt-2 text-center">A 'unit' can be one cookie, one tart shell, or one full batch.</p>
+                            </div>
+                            <div id="calc-by-weight" class="hidden">
+                                <div class="flex flex-col items-center space-y-2">
+                                    <div class="flex items-center justify-center space-x-4 w-full">
+                                        <label for="total-weight" class="text-lg font-medium text-pink-700 whitespace-nowrap">Desired total weight?</label>
+                                        <div class="flex items-center space-x-2">
+                                            <input type="number" id="total-weight" value="500" min="1" class="w-32 p-2 border border-pink-300 rounded-lg text-center text-lg font-bold focus:ring-2 focus:ring-pink-400 focus:outline-none">
+                                            <span class="text-pink-500 font-medium text-lg">g</span>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-pink-400 pt-2 text-center">This mode requires all ingredients to have a weight-based unit (g or kg).</p>
+                                </div>
+                            </div>
+                        </div>
+                        <button id="calculate-btn" class="w-full bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all">
+                            Calculate Totals
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Results -->
+                <div class="space-y-8 flex flex-col">
+                     <div class="space-y-4 flex flex-col flex-grow">
+                        <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2">Calculated Recipe Amount</h2>
+                        <div id="results-container" class="bg-pink-50 p-4 rounded-lg flex-grow">
+                           <p class="text-pink-400 italic text-center">Your calculated totals will appear here...</p>
+                       </div>
+                    </div>
+                    <div id="batch-info-panel" class="space-y-4 hidden">
+                        <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2">Batch Information</h2>
+                        <div id="batch-info-container" class="bg-pink-50 p-4 rounded-lg">
+                           <!-- Batch info populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Section: Instructions -->
+            <div class="mt-8 space-y-4">
+                <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2">Instructions</h2>
+                <div id="instructions-panel" class="bg-pink-50 p-4 rounded-lg min-h-[200px] prose prose-pink">
+                   <p class="text-pink-400 italic">Select a recipe to see the instructions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="w-full max-w-md mx-auto bg-white rounded-2xl shadow-lg p-8 space-y-6">
+        <div class="text-center">
+            <h1 class="title-font text-4xl text-pink-500">Welcome!</h1>
+            <p class="text-pink-400 mt-2">Login or register to save and access your recipes anywhere.</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label for="auth-email" class="block text-sm font-medium text-pink-700">Email</label>
+                <input type="email" id="auth-email" class="mt-1 w-full p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none">
+            </div>
+            <div>
+                <label for="auth-password" class="block text-sm font-medium text-pink-700">Password</label>
+                <input type="password" id="auth-password" class="mt-1 w-full p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none">
+            </div>
+            <p id="auth-error" class="text-sm text-red-500 text-center hidden"></p>
+        </div>
+        <div class="flex space-x-4">
+            <button id="login-btn" class="flex-grow bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all">Login</button>
+            <button id="register-btn" class="flex-grow bg-pink-200 hover:bg-pink-300 text-pink-700 font-bold py-3 px-6 rounded-lg transition-all">Register</button>
+        </div>
+    </div>
+
+    <!-- Recipe Management Modal -->
+    <div id="recipe-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl space-y-6">
+            <div class="flex justify-between items-center">
+                <h3 id="modal-title" class="text-2xl font-bold text-pink-600">Add New Recipe</h3>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
+            </div>
+            <div>
+                <label for="recipe-name-input" class="block text-sm font-medium text-pink-700 mb-1">Recipe Name</label>
+                <input type="text" id="recipe-name-input" placeholder="e.g., My Famous Cookies" class="w-full p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none">
+            </div>
+            <div id="modal-ingredients-container" class="space-y-3 max-h-40 overflow-y-auto pr-2">
+                <h4 class="font-semibold text-pink-600">Ingredients</h4>
+                <!-- Modal ingredients go here -->
+            </div>
+            <button id="modal-add-ingredient-btn" class="w-full bg-pink-200 hover:bg-pink-300 text-pink-700 font-semibold py-2 px-4 rounded-lg transition-colors">+ Add Ingredient</button>
+            
+            <div class="grid grid-cols-2 gap-4 pt-4">
+                <div>
+                    <label for="recipe-units-per-batch" class="block text-sm font-medium text-pink-700 mb-1">Units per Batch <span class="text-xs text-gray-400">(Optional)</span></label>
+                    <input type="number" id="recipe-units-per-batch" placeholder="e.g., 30" class="w-full p-2 border border-pink-200 rounded-lg">
+                </div>
+                <div>
+                    <label for="recipe-weight-per-unit" class="block text-sm font-medium text-pink-700 mb-1">Weight per Unit (g) <span class="text-xs text-gray-400">(Optional)</span></label>
+                    <input type="number" id="recipe-weight-per-unit" placeholder="e.g., 15" class="w-full p-2 border border-pink-200 rounded-lg">
+                </div>
+            </div>
+
+            <div>
+                <label for="recipe-instructions-input" class="block text-sm font-medium text-pink-700 mb-1">Instructions</label>
+                <textarea id="recipe-instructions-input" rows="5" placeholder="1. Preheat oven to 350°F...&#10;2. Mix dry ingredients...&#10;3. Bake for 20 minutes..." class="w-full p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none"></textarea>
+            </div>
+            <div class="flex space-x-4">
+                <button id="save-recipe-btn" class="flex-grow bg-pink-500 hover:bg-pink-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all">Save Recipe</button>
+                <button id="delete-recipe-btn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg shadow-md transition-all">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // --- Firebase SDK Imports ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, deleteDoc, onSnapshot, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- App State ---
+        let db, auth, userId, recipeUnsubscribe, appId;
+        let userRecipes = {};
+        let calculationMode = 'unit'; // 'unit' or 'weight'
+        const units = ["g", "kg", "ml", "L", "tsp", "tbsp", "cup", "pcs"];
+
+        // --- DOM Elements ---
+        const appContainer = document.getElementById('app-container');
+        const authModal = document.getElementById('auth-modal');
+        const authEmailInput = document.getElementById('auth-email');
+        const authPasswordInput = document.getElementById('auth-password');
+        const authError = document.getElementById('auth-error');
+        const loginBtn = document.getElementById('login-btn');
+        const registerBtn = document.getElementById('register-btn');
+        const signOutBtn = document.getElementById('sign-out-btn');
+        const userEmailSpan = document.getElementById('user-email');
+
+        const ingredientsList = document.getElementById('ingredients-list');
+        const instructionsPanel = document.getElementById('instructions-panel');
+        const calculateBtn = document.getElementById('calculate-btn');
+        const unitCountInput = document.getElementById('unit-count');
+        const totalWeightInput = document.getElementById('total-weight');
+        const resultsContainer = document.getElementById('results-container');
+        const batchInfoPanel = document.getElementById('batch-info-panel');
+        const batchInfoContainer = document.getElementById('batch-info-container');
+        const recipeSelect = document.getElementById('recipe-select');
+        const addRecipeBtn = document.getElementById('add-recipe-btn');
+        const editRecipeBtn = document.getElementById('edit-recipe-btn');
+        const recipeModal = document.getElementById('recipe-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const recipeNameInput = document.getElementById('recipe-name-input');
+        const recipeUnitsPerBatchInput = document.getElementById('recipe-units-per-batch');
+        const recipeWeightPerUnitInput = document.getElementById('recipe-weight-per-unit');
+        const recipeInstructionsInput = document.getElementById('recipe-instructions-input');
+        const modalIngredientsContainer = document.getElementById('modal-ingredients-container');
+        const modalAddIngredientBtn = document.getElementById('modal-add-ingredient-btn');
+        const saveRecipeBtn = document.getElementById('save-recipe-btn');
+        const deleteRecipeBtn = document.getElementById('delete-recipe-btn');
+        const calcModeUnitBtn = document.getElementById('calc-mode-unit');
+        const calcModeWeightBtn = document.getElementById('calc-mode-weight');
+        const calcByUnitDiv = document.getElementById('calc-by-unit');
+        const calcByWeightDiv = document.getElementById('calc-by-weight');
+
+        // --- Functions ---
+        
+        function addIngredientRow(container, data = {}) {
+            const { name = '', amount = '', unit = 'g' } = data;
+            const newRow = document.createElement('div');
+            newRow.className = 'ingredient-row flex items-center space-x-2';
+            const unitOptions = units.map(u => `<option value="${u}" ${u === unit ? 'selected' : ''}>${u}</option>`).join('');
+            newRow.innerHTML = `
+                <input type="text" placeholder="Ingredient Name" value="${name}" class="flex-grow p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none">
+                <input type="number" placeholder="Amount" value="${amount}" class="w-28 p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none">
+                <select class="w-24 p-2 border border-pink-200 rounded-lg focus:ring-2 focus:ring-pink-400 focus:outline-none bg-white">${unitOptions}</select>
+                <button onclick="this.parentElement.remove()" class="remove-btn bg-red-400 hover:bg-red-500 text-white font-bold py-1 px-3 rounded-full transition-colors">&times;</button>
+            `;
+            container.appendChild(newRow);
+        }
+
+        function loadRecipeToDisplay() {
+            const recipeId = recipeSelect.value;
+            const selectedRecipe = userRecipes[recipeId];
+            ingredientsList.innerHTML = '';
+            instructionsPanel.innerHTML = '<p class="text-pink-400 italic">Select a recipe to see the instructions.</p>';
+            batchInfoPanel.classList.add('hidden');
+
+            if (selectedRecipe) {
+                if (selectedRecipe.ingredients) {
+                    selectedRecipe.ingredients.forEach(ing => addIngredientRow(ingredientsList, ing));
+                }
+                if (selectedRecipe.instructions) {
+                    const formattedInstructions = selectedRecipe.instructions
+                        .split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line)
+                        .map(line => `<li>${line.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`)
+                        .join('');
+                    instructionsPanel.innerHTML = `<ol>${formattedInstructions}</ol>`;
+                }
+                editRecipeBtn.classList.remove('hidden');
+            } else {
+                editRecipeBtn.classList.add('hidden');
+            }
+        }
+
+        function populateRecipeDropdown() {
+            const currentSelection = recipeSelect.value;
+            recipeSelect.innerHTML = '';
+            
+            const sortedRecipes = Object.entries(userRecipes).sort((a,b) => a[1].name.localeCompare(b[1].name));
+
+            if (sortedRecipes.length === 0) {
+                 const option = document.createElement('option');
+                 option.textContent = "No recipes saved yet";
+                 option.disabled = true;
+                 recipeSelect.appendChild(option);
+            } else {
+                sortedRecipes.forEach(([id, recipe]) => {
+                    const option = document.createElement('option');
+                    option.value = id;
+                    option.textContent = recipe.name;
+                    recipeSelect.appendChild(option);
+                });
+            }
+
+            if (currentSelection && userRecipes[currentSelection]) {
+                recipeSelect.value = currentSelection;
+            }
+            
+            loadRecipeToDisplay();
+        }
+
+        function openRecipeModal(mode = 'add') {
+            if (mode === 'edit') {
+                const recipeId = recipeSelect.value;
+                const recipe = userRecipes[recipeId];
+                if (!recipe) return;
+                
+                modalTitle.textContent = 'Edit Recipe';
+                recipeNameInput.value = recipe.name;
+                recipeUnitsPerBatchInput.value = recipe.unitsPerBatch || '';
+                recipeWeightPerUnitInput.value = recipe.weightPerUnit || '';
+                recipeInstructionsInput.value = recipe.instructions || '';
+                recipeNameInput.dataset.originalId = recipeId;
+                modalIngredientsContainer.innerHTML = '<h4 class="font-semibold text-pink-600">Ingredients</h4>';
+                if(recipe.ingredients) {
+                    recipe.ingredients.forEach(ing => addIngredientRow(modalIngredientsContainer, ing));
+                }
+                deleteRecipeBtn.style.display = 'block';
+
+            } else { // 'add' mode
+                modalTitle.textContent = 'Add New Recipe';
+                recipeNameInput.value = '';
+                recipeUnitsPerBatchInput.value = '';
+                recipeWeightPerUnitInput.value = '';
+                recipeInstructionsInput.value = '';
+                recipeNameInput.dataset.originalId = '';
+                modalIngredientsContainer.innerHTML = '<h4 class="font-semibold text-pink-600">Ingredients</h4>';
+                addIngredientRow(modalIngredientsContainer);
+                deleteRecipeBtn.style.display = 'none';
+            }
+            recipeModal.classList.remove('hidden');
+        }
+
+        async function saveRecipe() {
+            if (!userId) {
+                alert("You must be logged in to save a recipe.");
+                return;
+            }
+            const recipeName = recipeNameInput.value.trim();
+            if (!recipeName) {
+                alert("Please enter a recipe name.");
+                return;
+            }
+
+            const ingredients = [];
+            modalIngredientsContainer.querySelectorAll('.ingredient-row').forEach(row => {
+                const name = row.querySelector('input[type="text"]').value.trim();
+                const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+                const unit = row.querySelector('select').value;
+                if (name && amount > 0) {
+                    ingredients.push({ name, amount, unit });
+                }
+            });
+            
+            const instructions = recipeInstructionsInput.value.trim();
+            const unitsPerBatch = parseFloat(recipeUnitsPerBatchInput.value) || 0;
+            const weightPerUnit = parseFloat(recipeWeightPerUnitInput.value) || 0;
+
+            if (ingredients.length === 0) {
+                alert("Please add at least one valid ingredient.");
+                return;
+            }
+            
+            const originalId = recipeNameInput.dataset.originalId;
+            const newId = recipeName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+            const recipeData = { name: recipeName, ingredients, instructions, unitsPerBatch, weightPerUnit };
+            
+            try {
+                if (originalId && originalId !== newId) {
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, originalId));
+                }
+                const recipeRef = doc(db, `artifacts/${appId}/users/${userId}/recipes`, newId);
+                await setDoc(recipeRef, recipeData);
+                recipeSelect.value = newId;
+                recipeModal.classList.add('hidden');
+            } catch (error) {
+                console.error("Error saving recipe: ", error);
+                alert("Failed to save recipe. Please try again.");
+            }
+        }
+        
+        async function deleteRecipe() {
+            const recipeIdToDelete = recipeNameInput.dataset.originalId;
+            if (!recipeIdToDelete || !confirm(`Are you sure you want to delete "${userRecipes[recipeIdToDelete].name}"?`)) {
+                return;
+            }
+            try {
+                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/recipes`, recipeIdToDelete));
+                recipeModal.classList.add('hidden');
+            } catch(error) {
+                console.error("Error deleting recipe:", error);
+                alert("Failed to delete recipe.");
+            }
+        }
+        
+        function calculateTotals() {
+            const ingredientRows = ingredientsList.querySelectorAll('.ingredient-row');
+            batchInfoPanel.classList.add('hidden');
+            if (ingredientRows.length === 0) {
+                resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please select a recipe with ingredients.</p>`;
+                return;
+            }
+
+            let resultsHTML = '';
+            
+            if (calculationMode === 'unit') {
+                const unitCount = parseFloat(unitCountInput.value) || 0;
+                if (unitCount <= 0) {
+                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please enter a valid number of units.</p>`;
+                    return;
+                }
+                resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${unitCount} unit(s), you will need:</h3><ul class="space-y-2">`;
+                ingredientRows.forEach(row => {
+                    const name = row.querySelector('input[type="text"]').value.trim();
+                    const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+                    const unit = row.querySelector('select').value;
+                    if (name && amount > 0) {
+                        const totalAmount = amount * unitCount;
+                        const formattedAmount = Number.isInteger(totalAmount) ? totalAmount.toLocaleString() : totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                        resultsHTML += `<li class="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm"><span class="font-medium text-pink-800">${name}</span><span class="font-bold text-lg text-pink-500">${formattedAmount} ${unit}</span></li>`;
+                    }
+                });
+
+                const recipeId = recipeSelect.value;
+                const currentRecipe = userRecipes[recipeId];
+                if (currentRecipe && currentRecipe.unitsPerBatch > 0) {
+                    const totalUnits = unitCount * currentRecipe.unitsPerBatch;
+                    let batchInfoHTML = `<ul class="space-y-2">`;
+                    batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Units per Batch:</span><span class="font-bold">${currentRecipe.unitsPerBatch}</span></li>`;
+                    batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Total Units:</span><span class="font-bold">${totalUnits.toLocaleString()}</span></li>`;
+                    if (currentRecipe.weightPerUnit > 0) {
+                        const totalWeight = totalUnits * currentRecipe.weightPerUnit;
+                        batchInfoHTML += `<li class="flex justify-between items-center"><span class="font-medium">Total Weight:</span><span class="font-bold">${totalWeight.toLocaleString()}g</span></li>`;
+                    }
+                    batchInfoHTML += `</ul>`;
+                    batchInfoContainer.innerHTML = batchInfoHTML;
+                    batchInfoPanel.classList.remove('hidden');
+                }
+
+            } else { // calculationMode === 'weight'
+                const desiredWeight = parseFloat(totalWeightInput.value) || 0;
+                if (desiredWeight <= 0) {
+                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Please enter a valid total weight.</p>`;
+                    return;
+                }
+
+                let singleBatchWeight = 0;
+                let hasInvalidUnit = false;
+                const baseIngredients = [];
+
+                ingredientRows.forEach(row => {
+                    const name = row.querySelector('input[type="text"]').value.trim();
+                    const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
+                    const unit = row.querySelector('select').value;
+                    
+                    baseIngredients.push({name, amount, unit});
+
+                    if (unit === 'g') {
+                        singleBatchWeight += amount;
+                    } else if (unit === 'kg') {
+                        singleBatchWeight += amount * 1000;
+                    } else {
+                        hasInvalidUnit = true;
+                    }
+                });
+
+                if (hasInvalidUnit) {
+                    resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Calculation error: 'By Total Weight' mode requires all ingredients to use 'g' or 'kg' units.</p>`;
+                    return;
+                }
+                
+                if (singleBatchWeight === 0) {
+                     resultsContainer.innerHTML = `<p class="text-red-500 font-bold text-center">Cannot calculate with a total base weight of 0.</p>`;
+                    return;
+                }
+
+                const scalingFactor = desiredWeight / singleBatchWeight;
+                resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${desiredWeight}g total, you will need:</h3><ul class="space-y-2">`;
+                
+                baseIngredients.forEach(ing => {
+                    if (ing.name && ing.amount > 0) {
+                        const totalAmount = ing.amount * scalingFactor;
+                        const formattedAmount = Number.isInteger(totalAmount) ? totalAmount.toLocaleString() : totalAmount.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+                        resultsHTML += `<li class="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm"><span class="font-medium text-pink-800">${ing.name}</span><span class="font-bold text-lg text-pink-500">${formattedAmount} ${ing.unit}</span></li>`;
+                    }
+                });
+            }
+
+            resultsHTML += `</ul>`;
+            resultsContainer.innerHTML = resultsHTML;
+        }
+
+        function setCalculationMode(mode) {
+            calculationMode = mode;
+            if (mode === 'unit') {
+                calcModeUnitBtn.classList.add('active');
+                calcModeWeightBtn.classList.remove('active');
+                calcByUnitDiv.classList.remove('hidden');
+                calcByWeightDiv.classList.add('hidden');
+            } else {
+                calcModeWeightBtn.classList.add('active');
+                calcModeUnitBtn.classList.remove('active');
+                calcByWeightDiv.classList.remove('hidden');
+                calcByUnitDiv.classList.add('hidden');
+            }
+        }
+
+        // --- Auth Functions ---
+        const handleAuthError = (error) => {
+            authError.textContent = error.message;
+            authError.classList.remove('hidden');
+        };
+
+        const clearAuthError = () => {
+            authError.textContent = '';
+            authError.classList.add('hidden');
+        };
+
+        const handleRegister = () => {
+            clearAuthError();
+            const email = authEmailInput.value;
+            const password = authPasswordInput.value;
+            createUserWithEmailAndPassword(auth, email, password)
+                .catch(handleAuthError);
+        };
+
+        const handleLogin = () => {
+            clearAuthError();
+            const email = authEmailInput.value;
+            const password = authPasswordInput.value;
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(handleAuthError);
+        };
+
+        const handleSignOut = () => {
+            signOut(auth);
+        };
+
+        // --- Main App Initialization and Event Listeners ---
+        function main() {
+            // Initialize Firebase
+            try {
+                appId = typeof __app_id !== 'undefined' ? __app_id : 'recipe-calculator-app';
+                const firebaseConfig = {
+  apiKey: "AIzaSyBd5oNs1PjHhOLVGS5u2Ovt0KeXLmQ5hn0",
+  authDomain: "recipe-batch-calculator.firebaseapp.com",
+  projectId: "recipe-batch-calculator",
+  storageBucket: "recipe-batch-calculator.firebasestorage.app",
+  messagingSenderId: "721027941165",
+  appId: "1:721027941165:web:0bedd2c40dfd2aaeb7c9a4"
+};
+                
+                if (!firebaseConfig.apiKey) {
+                    console.error("Firebase config is missing!");
+                    authModal.innerHTML = `<p class="text-red-500 text-center">Could not connect to the database. Configuration is missing.</p>`;
+                    return;
+                }
+
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+            } catch (e) {
+                console.error("Firebase initialization failed:", e);
+                authModal.innerHTML = `<p class="text-red-500 text-center">A critical error occurred. Could not start the application.</p>`;
+                return;
+            }
+
+            // Set up Auth State Listener
+            onAuthStateChanged(auth, user => {
+                if (user) {
+                    // User is signed in
+                    userId = user.uid;
+                    userEmailSpan.textContent = user.email;
+                    appContainer.classList.remove('hidden');
+                    authModal.classList.add('hidden');
+
+                    if (recipeUnsubscribe) recipeUnsubscribe();
+                    const recipesCol = collection(db, `artifacts/${appId}/users/${userId}/recipes`);
+                    recipeUnsubscribe = onSnapshot(recipesCol, (snapshot) => {
+                        userRecipes = {};
+                        snapshot.forEach((doc) => {
+                            userRecipes[doc.id] = doc.data();
+                        });
+                        populateRecipeDropdown();
+                    });
+                } else {
+                    // User is signed out
+                    userId = null;
+                    userRecipes = {};
+                    if (recipeUnsubscribe) recipeUnsubscribe();
+                    appContainer.classList.add('hidden');
+                    authModal.classList.remove('hidden');
+                    populateRecipeDropdown();
+                }
+            });
+
+            // Attach all event listeners
+            calculateBtn.addEventListener('click', calculateTotals);
+            recipeSelect.addEventListener('change', loadRecipeToDisplay);
+            addRecipeBtn.addEventListener('click', () => openRecipeModal('add'));
+            editRecipeBtn.addEventListener('click', () => openRecipeModal('edit'));
+            closeModalBtn.addEventListener('click', () => recipeModal.classList.add('hidden'));
+            modalAddIngredientBtn.addEventListener('click', () => addIngredientRow(modalIngredientsContainer));
+            saveRecipeBtn.addEventListener('click', saveRecipe);
+            deleteRecipeBtn.addEventListener('click', deleteRecipe);
+            calcModeUnitBtn.addEventListener('click', () => setCalculationMode('unit'));
+            calcModeWeightBtn.addEventListener('click', () => setCalculationMode('weight'));
+            loginBtn.addEventListener('click', handleLogin);
+            registerBtn.addEventListener('click', handleRegister);
+            signOutBtn.addEventListener('click', handleSignOut);
+        }
+
+        // Run the main function when the window is loaded
+        window.onload = main;
+
+    </script>
+</body>
+</html>

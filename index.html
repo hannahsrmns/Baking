@@ -33,10 +33,6 @@
         #recipe-modal, #auth-modal {
             transition: opacity 0.3s ease-in-out;
         }
-        #instructions-panel ol {
-            list-style-type: decimal;
-            padding-left: 1.5rem;
-        }
         .sortable-ghost {
             background-color: #fce7f3; /* pink-100 */
             opacity: 0.7;
@@ -120,7 +116,7 @@
             <!-- Bottom Section: Instructions -->
             <div class="mt-8 space-y-4">
                 <h2 class="text-2xl font-bold text-pink-600 border-b-2 border-pink-100 pb-2">Instructions</h2>
-                <div id="instructions-panel" class="bg-pink-50 p-4 rounded-lg min-h-[200px] prose prose-pink">
+                <div id="instructions-panel" class="bg-pink-50 p-4 rounded-lg min-h-[200px] whitespace-pre-wrap">
                    <p class="text-pink-400 italic">Select a recipe to see the instructions.</p>
                 </div>
             </div>
@@ -235,7 +231,7 @@
 
         // --- Functions ---
         
-        function addIngredientRow(container, data = {}) {
+        function addModalIngredientRow(container, data = {}) {
             const { name = '', amount = '', unit = 'g' } = data;
             const newRow = document.createElement('div');
             newRow.className = 'ingredient-row flex items-center space-x-2 group';
@@ -254,6 +250,21 @@
             container.appendChild(newRow);
         }
 
+        function addDisplayIngredientRow(container, data = {}) {
+            const { name = '', amount = '', unit = 'g' } = data;
+            const newRow = document.createElement('div');
+            newRow.className = 'ingredient-row flex items-center space-x-2';
+            const unitOptions = units.map(u => `<option value="${u}" ${u === unit ? 'selected' : ''}>${u}</option>`).join('');
+            newRow.innerHTML = `
+                <span class="flex-grow p-2 bg-gray-50 text-gray-700 rounded-lg">${name}</span>
+                <div class="flex items-center justify-center space-x-2">
+                    <input type="number" placeholder="Amount" value="${amount}" class="w-28 p-2 border-transparent rounded-lg bg-gray-50 text-gray-700 text-center" readonly>
+                    <select class="w-24 p-2 border-transparent rounded-lg bg-gray-50 text-gray-700" disabled>${unitOptions}</select>
+                </div>
+            `;
+            container.appendChild(newRow);
+        }
+
         function loadRecipeToDisplay() {
             const recipeId = recipeSelect.value;
             const selectedRecipe = userRecipes[recipeId];
@@ -263,16 +274,10 @@
 
             if (selectedRecipe) {
                 if (selectedRecipe.ingredients) {
-                    selectedRecipe.ingredients.forEach(ing => addIngredientRow(ingredientsList, ing));
+                    selectedRecipe.ingredients.forEach(ing => addDisplayIngredientRow(ingredientsList, ing));
                 }
                 if (selectedRecipe.instructions) {
-                    const formattedInstructions = selectedRecipe.instructions
-                        .split('\n')
-                        .map(line => line.trim())
-                        .filter(line => line)
-                        .map(line => `<li>${line.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</li>`)
-                        .join('');
-                    instructionsPanel.innerHTML = `<ol>${formattedInstructions}</ol>`;
+                    instructionsPanel.textContent = selectedRecipe.instructions;
                 }
                 editRecipeBtn.classList.remove('hidden');
             } else {
@@ -325,7 +330,7 @@
                 recipeNameInput.dataset.originalId = recipeId;
                 modalIngredientsContainer.innerHTML = '<h4 class="font-semibold text-pink-600">Ingredients</h4>';
                 if(recipe.ingredients) {
-                    recipe.ingredients.forEach(ing => addIngredientRow(modalIngredientsContainer, ing));
+                    recipe.ingredients.forEach(ing => addModalIngredientRow(modalIngredientsContainer, ing));
                 }
                 deleteRecipeBtn.style.display = 'block';
 
@@ -337,7 +342,7 @@
                 recipeInstructionsInput.value = '';
                 recipeNameInput.dataset.originalId = '';
                 modalIngredientsContainer.innerHTML = '<h4 class="font-semibold text-pink-600">Ingredients</h4>';
-                addIngredientRow(modalIngredientsContainer);
+                addModalIngredientRow(modalIngredientsContainer);
                 deleteRecipeBtn.style.display = 'none';
             }
             recipeModal.classList.remove('hidden');
@@ -426,7 +431,7 @@
             }
             let resultsHTML = `<h3 class="text-xl font-semibold mb-3 text-pink-700">For ${batchCount} batch(es), you will need:</h3><ul class="space-y-2">`;
             ingredientRows.forEach(row => {
-                const name = row.querySelector('input[type="text"]').value.trim();
+                const name = row.querySelector('span').textContent.trim();
                 const amount = parseFloat(row.querySelector('input[type="number"]').value) || 0;
                 const unit = row.querySelector('select').value;
                 if (name && amount > 0) {
@@ -497,14 +502,14 @@
             // Initialize Firebase
             try {
                 appId = typeof __app_id !== 'undefined' ? __app_id : 'recipe-calculator-app';
-const firebaseConfig = {
-  apiKey: "AIzaSyBd5oNs1PjHhOLVGS5u2Ovt0KeXLmQ5hn0",
-  authDomain: "recipe-batch-calculator.firebaseapp.com",
-  projectId: "recipe-batch-calculator",
-  storageBucket: "recipe-batch-calculator.firebasestorage.app",
-  messagingSenderId: "721027941165",
-  appId: "1:721027941165:web:0bedd2c40dfd2aaeb7c9a4"
-};
+                const firebaseConfig = {
+                    apiKey: "AIzaSyBd5oNs1PjHhOLVGS5u2Ovt0KeXLmQ5hn0",
+                    authDomain: "recipe-batch-calculator.firebaseapp.com",
+                    projectId: "recipe-batch-calculator",
+                    storageBucket: "recipe-batch-calculator.appspot.com",
+                    messagingSenderId: "721027941165",
+                    appId: "1:721027941165:web:0bedd2c40dfd2aaeb7c9a4"
+                };
                 
                 if (!firebaseConfig.apiKey) {
                     console.error("Firebase config is missing!");
@@ -556,7 +561,7 @@ const firebaseConfig = {
             addRecipeBtn.addEventListener('click', () => openRecipeModal('add'));
             editRecipeBtn.addEventListener('click', () => openRecipeModal('edit'));
             closeModalBtn.addEventListener('click', () => recipeModal.classList.add('hidden'));
-            modalAddIngredientBtn.addEventListener('click', () => addIngredientRow(modalIngredientsContainer));
+            modalAddIngredientBtn.addEventListener('click', () => addModalIngredientRow(modalIngredientsContainer));
             saveRecipeBtn.addEventListener('click', saveRecipe);
             deleteRecipeBtn.addEventListener('click', deleteRecipe);
             loginBtn.addEventListener('click', handleLogin);
